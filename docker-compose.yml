@@ -1,0 +1,71 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: society_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: society_user
+      POSTGRES_PASSWORD: society_pass
+      POSTGRES_DB: society_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U society_user -d society_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: society_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://society_user:society_pass@db:5432/society_db
+      JWT_SECRET: supersecretjwtkey_changeinproduction
+      JWT_EXPIRES_IN: 8h
+      REFRESH_TOKEN_EXPIRES_IN: 7d
+      PORT: 3000
+      NODE_ENV: development
+      STORAGE_DRIVER: local
+      UPLOAD_DIR: /uploads
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - backend_dev_node_modules:/app/node_modules
+      - backend_dev_prisma_client:/app/node_modules/.prisma
+      - uploads_data:/uploads
+    command: >
+      sh -c "npx prisma migrate deploy && npx prisma generate && npx prisma db seed && npm run dev"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: society_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:3000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
+  backend_dev_node_modules:
+  backend_dev_prisma_client:
+  uploads_data:

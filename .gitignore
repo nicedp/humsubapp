@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Build output
+dist/
+build/
+coverage/
+.vite/
+.cache/
+
+# Frontend output
+frontend/dist/
+
+# Backend output and generated files
+backend/dist/
+backend/.prisma/
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# Local uploads and runtime files
+uploads/
+**/uploads/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# TLS certificates and private keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Docker local override and runtime files
+docker-compose.override.yml
+.docker/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.code-workspace
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary, backup, and dump files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+backup_*.sql
+
+Society_Management_Portal.postman_collection.json
+
+# Repository documentation and AI project rules
+DEPLOYMENT.md
+FEATURES.md
+deploy_plan.md
+.aiderules

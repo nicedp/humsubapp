@@ -1,0 +1,1007 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum SocietyStatus {
+  pending    // registered, wizard not started
+  setup      // wizard in progress
+  active     // wizard complete, operational
+  suspended  // disabled
+}
+
+enum Role {
+  admin
+  sub_admin
+  member
+  owner
+  tenant
+  security
+}
+
+enum FlatStatus {
+  occupied
+  vacant
+}
+
+enum FlatType {
+  flat
+  single
+  duplex
+  triplex
+  bungalow
+  penthouse
+}
+
+enum BlockType {
+  flats
+  rowhouses
+  mixed
+}
+
+enum ResidentType {
+  owner
+  tenant
+}
+
+enum BillStatus {
+  unpaid
+  paid
+  overdue
+}
+
+enum PaymentMode {
+  cash
+  upi
+  bank_transfer
+  cheque
+}
+
+enum VehicleType {
+  car
+  bike
+  scooter
+  other
+}
+
+enum VisitorType {
+  guest
+  delivery
+  milkman
+  service
+  plumber
+  electrician
+  dth
+  broadband
+  solar
+  gas
+  cab
+  courier
+  other
+}
+
+enum IncomeSource {
+  sponsorship
+  advertisement
+  event
+  rental
+  donation
+  other
+}
+
+enum EventStatus {
+  planning
+  active
+  completed
+  cancelled
+}
+
+enum AMCStatus {
+  active
+  expired
+  cancelled
+  pending_renewal
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  paid
+  cancelled
+}
+
+enum AssetType {
+  lift
+  borewell
+  water_tank
+  generator
+  other
+}
+
+enum AssetStatus {
+  operational
+  under_maintenance
+  out_of_service
+}
+
+enum ComplaintStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+enum ComplaintCategory {
+  maintenance
+  noise
+  cleanliness
+  security
+  billing
+  other
+}
+
+enum NoticePriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum HelperCategory {
+  electrician
+  plumber
+  carpenter
+  ac_service
+  motor_binding
+  generator_service
+  painting
+  pest_control
+  housekeeping
+  security_service
+  other
+}
+
+enum CommitteeDesignation {
+  president
+  vice_president
+  secretary
+  joint_secretary
+  treasurer
+  joint_treasurer
+  member
+  advisor
+}
+
+enum AchievementCategory {
+  infrastructure
+  finance
+  community
+  legal
+  safety
+  other
+}
+
+// ─────────────────────────────────────────────
+// MODELS
+// ─────────────────────────────────────────────
+
+model Society {
+  id                 Int           @id @default(autoincrement())
+  name               String
+  address            String?
+  registrationNumber String?       @unique
+  contactEmail       String?       @unique
+  contactPhone       String?
+  city               String?
+  state              String?
+  pincode            String?
+  status             SocietyStatus @default(active)
+  setupToken         String?       @unique
+  setupTokenExpiry   DateTime?
+  logoUrl            String?
+  activatedAt        DateTime?
+  societyUrl         String?       @unique  // slug e.g. "green-valley-apartments"
+  accountNumber      String?       @unique  // format YYYYMM/NNNN e.g. "202607/0001"
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  settings           SocietySetting[]
+  blocks             Block[]
+  flats              Flat[]
+  assets             Asset[]
+  notices            Notice[]
+  staff              Staff[]
+  users              User[]
+  parkingSlots       ParkingSlot[]
+  expenses           Expense[]
+  expenseCategories  ExpenseCategory[]
+  incomeRecords      IncomeRecord[]
+  invoices           Invoice[]
+  events             Event[]
+  vendors            Vendor[]
+  amcContracts       AmcContract[]
+  userNotes          UserNote[]
+  helpers            Helper[]
+  committees         Committee[]
+  onboardingSession  OnboardingSession?
+
+  @@map("societies")
+}
+
+model Block {
+  id          String    @id @default(uuid())
+  societyId   Int       @default(1)
+  name        String                    // e.g. "Block A", "Block B"
+  description String?
+  blockType   BlockType @default(flats)
+  totalFloors Int?                      // max floors; null for row-house blocks
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  society Society @relation(fields: [societyId], references: [id])
+  flats   Flat[]
+
+  @@unique([societyId, name])
+  @@map("blocks")
+}
+
+model Flat {
+  id           String     @id @default(uuid())
+  societyId    Int
+  blockId      String?
+  flatNumber   String
+  floor        Int?
+  type         FlatType   @default(flat)
+  sqFt         Float
+  status       FlatStatus @default(vacant)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  society           Society              @relation(fields: [societyId], references: [id])
+  block             Block?               @relation(fields: [blockId], references: [id])
+  residents         Resident[]
+  maintenanceBills  MaintenanceBill[]
+  visitors          Visitor[]
+  parkingSlots      ParkingSlot[]
+  complaints        Complaint[]
+  notifications     Notification[]
+  vehicles          Vehicle[]
+  eventContributions EventContribution[]
+
+  @@unique([societyId, flatNumber])
+  @@map("flats")
+}
+
+model Resident {
+  id                    String       @id @default(uuid())
+  name                  String
+  email                 String?      @unique
+  phone                 String
+  whatsapp              String?
+  flatId                String
+  residentType          ResidentType
+  isActive              Boolean      @default(true)
+  moveInDate            DateTime     @default(now())
+  moveOutDate           DateTime?
+  numCars               Int          @default(0)
+  numBikes              Int          @default(0)
+  dateOfBirth           DateTime?
+  idProofType           String?
+  idProofNumber         String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  flat             Flat               @relation(fields: [flatId], references: [id])
+  user             User?
+  vehicles         Vehicle[]
+  familyMembers    FamilyMember[]
+  eventTeams       EventTeamMember[]
+  committeeMembers CommitteeMember[]
+
+  @@map("residents")
+}
+
+model FamilyMember {
+  id          String    @id @default(uuid())
+  residentId  String
+  name        String
+  relation    String    // spouse, child, parent, sibling, other
+  phone       String?
+  dateOfBirth DateTime?
+  isEmergency Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  resident Resident @relation(fields: [residentId], references: [id], onDelete: Cascade)
+
+  @@map("family_members")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  societyId    Int
+  username     String
+  passwordHash String
+  role         Role
+  residentId   String?  @unique
+  staffId      String?  @unique
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  society            Society              @relation(fields: [societyId], references: [id])
+  resident           Resident?            @relation(fields: [residentId], references: [id])
+  staff              Staff?               @relation(fields: [staffId], references: [id])
+  notifications      Notification[]
+  notes              UserNote[]
+  loginSessions      LoginSession[]
+  passwordResetTokens PasswordResetToken[]
+  totpSecret         TotpSecret?
+
+  @@unique([societyId, username])
+  @@map("users")
+}
+
+model MaintenanceBill {
+  id        String     @id @default(uuid())
+  flatId    String
+  month     Int        // 1-12
+  year      Int
+  amount    Float
+  status    BillStatus @default(unpaid)
+  dueDate   DateTime
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  flat    Flat     @relation(fields: [flatId], references: [id])
+  payment Payment?
+
+  @@unique([flatId, month, year])
+  @@map("maintenance_bills")
+}
+
+model Payment {
+  id          String      @id @default(uuid())
+  billId      String      @unique
+  amountPaid  Float
+  paidOn      DateTime    @default(now())
+  paymentMode PaymentMode
+  notes       String?
+  recordedBy  String?     // admin user id who recorded it
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  bill MaintenanceBill @relation(fields: [billId], references: [id])
+
+  @@map("payments")
+}
+
+model Visitor {
+  id            String      @id @default(uuid())
+  flatId        String
+  visitorName   String
+  phone         String?
+  vehicleNumber String?     // optional visitor vehicle number
+  visitorType   VisitorType @default(other)
+  purpose       String?     // optional notes / additional info
+  entryTime     DateTime    @default(now())
+  exitTime      DateTime?
+  loggedBy      String?     // staff/guard user id
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  flat Flat @relation(fields: [flatId], references: [id])
+
+  @@map("visitors")
+}
+
+model Asset {
+  id              String      @id @default(uuid())
+  societyId       Int
+  name            String
+  type            AssetType
+  status          AssetStatus @default(operational)
+  location        String?
+  lastServiceDate DateTime?
+  nextServiceDue  DateTime?
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  society      Society       @relation(fields: [societyId], references: [id])
+  amcContracts AmcContract[]
+
+  @@map("assets")
+}
+
+model ParkingSlot {
+  id            String   @id @default(uuid())
+  societyId     Int
+  slotNumber    String
+  flatId        String?
+  vehicleNumber String?
+  vehicleType   String?
+  isOccupied    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  society Society @relation(fields: [societyId], references: [id])
+  flat    Flat?   @relation(fields: [flatId], references: [id])
+
+  @@unique([societyId, slotNumber])
+  @@map("parking_slots")
+}
+
+model Notice {
+  id        String         @id @default(uuid())
+  societyId Int
+  title     String
+  body      String
+  priority  NoticePriority @default(normal)
+  postedBy  String?        // admin user id
+  postedOn  DateTime       @default(now())
+  expiresOn DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  society Society @relation(fields: [societyId], references: [id])
+
+  @@map("notices")
+}
+
+model Complaint {
+  id          String            @id @default(uuid())
+  flatId      String
+  raisedBy    String?           // resident user id
+  category    ComplaintCategory
+  description String
+  status      ComplaintStatus   @default(open)
+  adminRemark String?
+  raisedOn    DateTime          @default(now())
+  resolvedOn  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  flat Flat @relation(fields: [flatId], references: [id])
+
+  @@map("complaints")
+}
+
+model Staff {
+  id        String   @id @default(uuid())
+  societyId Int
+  name      String
+  role      String   // e.g. "security_guard", "cleaner"
+  phone     String?
+  shift     String?  // e.g. "morning", "evening", "night"
+  joinDate  DateTime @default(now())
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  society Society @relation(fields: [societyId], references: [id])
+  user    User?
+
+  @@map("staff")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  flatId    String?
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User  @relation(fields: [userId], references: [id])
+  flat Flat? @relation(fields: [flatId], references: [id])
+
+  @@map("notifications")
+}
+
+model Vehicle {
+  id            String      @id @default(uuid())
+  residentId    String
+  flatId        String
+  vehicleType   VehicleType
+  vehicleNumber String      @unique
+  make          String?     // e.g. "Honda", "Maruti"
+  model         String?     // e.g. "City", "Swift"
+  color         String?
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  resident Resident @relation(fields: [residentId], references: [id])
+  flat     Flat     @relation(fields: [flatId], references: [id])
+
+  @@map("vehicles")
+}
+
+model ExpenseCategory {
+  id        Int      @id @default(autoincrement())
+  societyId Int      @default(1)
+  name      String
+  slug      String
+  color     String?
+  isDefault Boolean  @default(false)
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  society Society @relation(fields: [societyId], references: [id])
+
+  @@unique([societyId, slug])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  societyId   Int      @default(1)
+  title       String
+  category    String
+  amount      Float
+  paidOn      DateTime
+  vendor      String?
+  notes       String?
+  recordedBy  String?  // admin user id who recorded it
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  society Society @relation(fields: [societyId], references: [id])
+
+  @@map("expenses")
+}
+
+model IncomeRecord {
+  id          String       @id @default(uuid())
+  societyId   Int          @default(1)
+  title       String
+  source      IncomeSource
+  amount      Float
+  receivedOn  DateTime
+  payer       String?      // sponsor / advertiser name
+  notes       String?
+  recordedBy  String?      // admin user id
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  society Society @relation(fields: [societyId], references: [id])
+
+  @@map("income_records")
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  societyId      Int           @default(1)
+  invoiceNumber  String        @unique  // e.g. INV-2026-001
+  status         InvoiceStatus @default(draft)
+  // From party (society)
+  fromName       String
+  fromAddress    String?
+  fromPhone      String?
+  fromEmail      String?
+  // To party (recipient)
+  toName         String
+  toAddress      String?
+  toPhone        String?
+  toEmail        String?
+  // Dates
+  invoiceDate    DateTime      @default(now())
+  dueDate        DateTime?
+  // Amounts
+  subtotal       Float         @default(0)
+  taxRate        Float         @default(0)   // percentage, e.g. 18 for 18%
+  taxAmount      Float         @default(0)
+  totalAmount    Float         @default(0)
+  notes          String?
+  createdBy      String?       // admin user id
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  society Society       @relation(fields: [societyId], references: [id])
+  items   InvoiceItem[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float
+  amount      Float   // quantity * unitPrice
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model SocietySetting {
+  id         String   @id @default(uuid())
+  societyId  Int      @default(1)   // always 1 for single-society deployment
+  varName    String                  // e.g. "rate_per_sqft", "society_name"
+  varValue   String                  // always stored as string; service casts to correct type
+  updatedAt  DateTime @updatedAt
+
+  society Society @relation(fields: [societyId], references: [id])
+
+  @@unique([societyId, varName])
+  @@map("society_settings")
+}
+
+// ─────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────
+
+model Event {
+  id           String      @id @default(uuid())
+  societyId    Int         @default(1)
+  name         String
+  description  String?
+  eventDate    DateTime
+  status       EventStatus @default(planning)
+  budgetTarget Float?
+  createdBy    String?     // admin userId
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  society       Society              @relation(fields: [societyId], references: [id])
+  contributions EventContribution[]
+  expenses      EventExpense[]
+  teamMembers   EventTeamMember[]
+
+  @@map("events")
+}
+
+model EventContribution {
+  id              String      @id @default(uuid())
+  eventId         String
+  contributorName String
+  flatId          String?     // optional — auto-fills name when selected
+  amount          Float
+  paymentMode     PaymentMode @default(cash)
+  paidOn          DateTime    @default(now())
+  notes           String?
+  recordedBy      String?     // admin userId
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  flat  Flat? @relation(fields: [flatId], references: [id])
+
+  @@map("event_contributions")
+}
+
+model EventExpense {
+  id         String   @id @default(uuid())
+  eventId    String
+  title      String
+  category   String
+  amount     Float
+  paidOn     DateTime @default(now())
+  vendor     String?
+  notes      String?
+  recordedBy String?  // admin userId
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("event_expenses")
+}
+
+model EventTeamMember {
+  id         String   @id @default(uuid())
+  eventId    String
+  residentId String
+  role       String
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  event    Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  resident Resident @relation(fields: [residentId], references: [id])
+
+  @@unique([eventId, residentId])
+  @@map("event_team_members")
+}
+
+// ─────────────────────────────────────────────
+// VENDOR SERVICES / AMC
+// ─────────────────────────────────────────────
+
+model Vendor {
+  id            String   @id @default(uuid())
+  societyId     Int      @default(1)
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  serviceType   String   // "Lift AMC", "Water Tank Cleaning", etc.
+  notes         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  society   Society       @relation(fields: [societyId], references: [id])
+  contracts AmcContract[]
+
+  @@map("vendors")
+}
+
+model AmcContract {
+  id                   String    @id @default(uuid())
+  societyId            Int       @default(1)
+  vendorId             String
+  assetId              String?   // optional link to existing assets table
+  contractNumber       String?
+  serviceType          String
+  annualCost           Float
+  startDate            DateTime
+  endDate              DateTime
+  serviceFrequencyDays Int       @default(90) // 90=quarterly, 180=bi-annual, 365=annual
+  lastServiceDate      DateTime?
+  nextServiceDue       DateTime?
+  status               AMCStatus @default(active)
+  notes                String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  society     Society          @relation(fields: [societyId], references: [id])
+  vendor      Vendor           @relation(fields: [vendorId], references: [id])
+  asset       Asset?           @relation(fields: [assetId], references: [id])
+  serviceLogs AmcServiceLog[]
+
+  @@map("amc_contracts")
+}
+
+model AmcServiceLog {
+  id             String    @id @default(uuid())
+  contractId     String
+  serviceDate    DateTime
+  technicianName String?
+  workDone       String
+  serviceCost    Float?
+  nextServiceDue DateTime? // admin override; if null → auto = serviceDate + freqDays
+  remarks        String?
+  recordedBy     String?   // admin userId
+  createdAt      DateTime  @default(now())
+
+  contract AmcContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@map("amc_service_logs")
+}
+
+// ─────────────────────────────────────────────
+// USER NOTES
+// ─────────────────────────────────────────────
+
+model UserNote {
+  id        String   @id @default(uuid())
+  userId    String
+  societyId Int      @default(1)
+  title     String
+  content   String   @default("")
+  color     String   @default("yellow") // yellow|blue|pink|green|purple|white
+  isPinned  Boolean  @default(false)
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  society Society @relation(fields: [societyId], references: [id])
+
+  @@map("user_notes")
+}
+
+// ─────────────────────────────────────────────
+// HELPERS DIRECTORY
+// ─────────────────────────────────────────────
+
+model Helper {
+  id             String         @id @default(uuid())
+  societyId      Int            @default(1)
+  name           String
+  phone          String
+  alternatePhone String?
+  email          String?
+  category       HelperCategory
+  description    String?
+  photoUrl       String?        // URL from storage.service (local path or S3 URL)
+  isActive       Boolean        @default(true)
+  addedBy        String?        // admin userId
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  society Society @relation(fields: [societyId], references: [id])
+
+  @@map("helpers")
+}
+
+// ─────────────────────────────────────────────
+// ACL — Sprint 5
+// ─────────────────────────────────────────────
+
+enum PermissionModule {
+  billing
+  residents
+  flats
+  visitors
+  notices
+  complaints
+  staff
+  assets
+  parking
+  expenses
+  income
+  invoices
+  events
+  vendors
+  committee
+  helpers
+  settings
+  users
+  reports
+}
+
+model RolePermission {
+  id        String           @id @default(uuid())
+  societyId Int
+  role      String           // "sub_admin" or "member"
+  module    PermissionModule
+  canView   Boolean          @default(false)
+  canCreate Boolean          @default(false)
+  canEdit   Boolean          @default(false)
+  canDelete Boolean          @default(false)
+  canExport Boolean          @default(false)
+  updatedBy String?
+  updatedAt DateTime         @updatedAt
+
+  @@unique([societyId, role, module])
+  @@map("role_permissions")
+}
+
+// ─────────────────────────────────────────────
+// AUTH OVERHAUL — Sprint 2
+// ─────────────────────────────────────────────
+
+model BlacklistedToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("blacklisted_tokens")
+}
+
+model LoginSession {
+  id        String   @id @default(uuid())
+  userId    String
+  ipAddress String
+  userAgent String
+  browser   String?
+  device    String?
+  city      String?
+  loggedAt  DateTime @default(now())
+  isActive  Boolean  @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("login_sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique  // crypto.randomBytes(32).toString('hex')
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model TotpSecret {
+  userId      String   @id
+  secret      String
+  isEnabled   Boolean  @default(false)
+  backupCodes String[] // hashed backup codes
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("totp_secrets")
+}
+
+// ─────────────────────────────────────────────
+// COMMITTEE & ACHIEVEMENTS — Sprint 3
+// ─────────────────────────────────────────────
+
+model Committee {
+  id          String    @id @default(uuid())
+  societyId   Int       @default(1)
+  name        String                           // e.g. "2024-25 Managing Committee"
+  formedOn    DateTime
+  dissolvedOn DateTime?
+  isActive    Boolean   @default(false)        // only one per societyId can be true
+  createdBy   String?                          // admin userId
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  society      Society               @relation(fields: [societyId], references: [id])
+  members      CommitteeMember[]
+  achievements CommitteeAchievement[]
+
+  @@unique([societyId, name])
+  @@map("committees")
+}
+
+model CommitteeMember {
+  id            String                @id @default(uuid())
+  committeeId   String
+  residentId    String
+  designation   CommitteeDesignation
+  isActive      Boolean               @default(true)
+  joinedOn      DateTime              @default(now())
+  leftOn        DateTime?
+  notes         String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  committee Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  resident  Resident  @relation(fields: [residentId], references: [id])
+
+  @@unique([committeeId, residentId])
+  @@map("committee_members")
+}
+
+model CommitteeAchievement {
+  id          String              @id @default(uuid())
+  committeeId String
+  title       String
+  description String?
+  achievedOn  DateTime
+  category    AchievementCategory
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  committee Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+
+  @@map("committee_achievements")
+}
+
+// ─────────────────────────────────────────────
+// ONBOARDING WIZARD — Sprint 4
+// ─────────────────────────────────────────────
+
+model OnboardingSession {
+  id           String    @id @default(uuid())
+  societyId    Int       @unique
+  currentStep  Int       @default(1)
+  step1Data    Json?     // society profile snapshot
+  step2Data    Json?     // admin metadata (username ONLY — no password)
+  step3Data    Json?     // billing config snapshot
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  society Society @relation(fields: [societyId], references: [id], onDelete: Cascade)
+
+  @@map("onboarding_sessions")
+}

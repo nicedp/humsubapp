@@ -1,0 +1,24 @@
+docker run --name peaceful_euler -e POSTGRES_PASSWORD=mysecretpassword -d postgres
+
+Connecting and Managing Connectionspsql -U username -d dbname — Connect to a specific database as a user.
+psql -U postgres — Connect to the default Postgres database.
+\q — Quit and exit the psql interface.
+\c dbname — Connect/switch to a different database.
+
+🔍 Viewing Database Structure (List Commands)
+\l — List all databases.
+\dt — List all tables in the current database.
+\d tablename — Show the structure, columns, and data types of a specific table.
+\du — List all users and their roles.
+\df — List all functions.
+\dn — List all schemas.
+
+psql -U postgres
+
+CREATE USER society_user WITH PASSWORD 'society_pass';
+
+CREATE DATABASE society_db;
+
+GRANT ALL PRIVILEGES ON DATABASE society_db TO society_user;
+
+psql -U society_user -d society_db;
